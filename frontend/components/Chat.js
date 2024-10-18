@@ -6,11 +6,13 @@ const Chat = ({ roomId }) => {
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
+    console.log(messages)
     socket.on('chat_message', (msg) => setMessages((prev) => [...prev, msg]));
 
     return () => {
       socket.off('chat_message');
     };
+   
   }, []);
 
   const sendMessage = () => {

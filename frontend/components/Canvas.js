@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import axios from 'axios';
 
-const Canvas = ({ onSave }) => {
+const Canvas = ({ currentColor, isEraserActive }) => {
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -16,7 +16,6 @@ const Canvas = ({ onSave }) => {
     const context = canvas.getContext('2d');
     context.lineCap = 'round'; // Set the shape of the brush tip
     context.lineWidth = 5; // Brush thickness
-    context.strokeStyle = 'black'; // Brush color
     contextRef.current = context;
   }, []);
 
@@ -34,6 +33,7 @@ const Canvas = ({ onSave }) => {
 
     const { offsetX, offsetY } = nativeEvent;
     contextRef.current.lineTo(offsetX, offsetY);
+    contextRef.current.strokeStyle = isEraserActive ? 'blue' : currentColor; // Use blue for eraser effect
     contextRef.current.stroke();
   };
 
@@ -44,39 +44,79 @@ const Canvas = ({ onSave }) => {
   };
 
   // Save the canvas drawing as a Data URL
-  const submitDrawing = async() => {
+  const submitDrawing = async () => {
     const canvas = canvasRef.current;
     const dataUrl = canvas.toDataURL();
     console.log(dataUrl);
 
-    await axios.post('http://127.0.0.1:5000/predict', 
-      {
-      dataUrl
-    }).then((response) => {
+    try {
+      const response = await axios.post('http://127.0.0.1:5000/predict', {
+        dataUrl,
+      });
       console.log(response.data);
-    }).catch((error) => {
+    } catch (error) {
       console.error('There was an error!', error);
-    })
+    }
+  };
 
-
-
+  // Clear the canvas
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    const context = contextRef.current;
+    context.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
   };
 
   return (
-    <div>
+    <div style={styles.container}>
       <canvas
         ref={canvasRef}
         width="500"
         height="500"
-        style={{ border: '1px solid white', backgroundColor: "blue" }}
+        style={styles.canvas}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
         onMouseLeave={stopDrawing} // Stop drawing if the user leaves the canvas area
       />
-      <button onClick={submitDrawing}>Submit Drawing</button>
+      <div style={styles.buttonContainer}>
+        <button onClick={submitDrawing} style={styles.button}>
+          Submit Drawing
+        </button>
+        <button onClick={clearCanvas} style={styles.button}>
+          Clear Canvas
+        </button>
+      </div>
     </div>
   );
+};
+
+// Styles
+const styles = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  canvas: {
+    border: '1px solid white',
+    backgroundColor: 'blue',
+  },
+  buttonContainer: {
+    marginTop: '10px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  button: {
+    padding: '10px 15px',
+    margin: '0 5px',
+    backgroundColor: '#007bff',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '16px',
+  },
 };
 
 export default Canvas;

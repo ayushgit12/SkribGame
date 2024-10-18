@@ -1,4 +1,4 @@
-// File: /Users/ayush/Developer/WEBD/MasterStack/game3/frontend/app/page.js
+// File: /Users/ayush/Developer/WEBD/MasterStack/gam4/frontend/app/page.js
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

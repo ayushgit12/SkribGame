@@ -4,6 +4,7 @@ from flask_cors import CORS
 import google.generativeai as genai
 from io import BytesIO
 from PIL import Image
+import base64
 
 app = Flask(__name__)
 CORS(app)
@@ -25,34 +26,44 @@ def get_random_image():
         }
     return None
 
+def convert_image_to_base64(image_url):
+    """Convert image from URL to base64"""
+    response = requests.get(image_url)
+    if response.status_code == 200:
+        image = Image.open(BytesIO(response.content))
+        buffered = BytesIO()
+        image.save(buffered, format="JPEG")
+        img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        return f"data:image/jpeg;base64,{img_base64}"
+    return None
+
 def process_image_with_gemini(image_url):
     """Download image and process with Gemini API"""
-    # Step 1: Download the image
-    image_response = requests.get(image_url)
-    if image_response.status_code == 200:
-        # Step 2: Save the image in memory and pass it to Gemini
-        image = Image.open(BytesIO(image_response.content))
-        image.save("temp_image.jpg")
+    # Step 1: Download the image and convert to base64
+    base64_image = convert_image_to_base64(image_url)
+    
+    if not base64_image:
+        return "Error converting image to base64"
+    
+    # Step 2: Upload the image to Gemini and generate description
+    uploaded_file = genai.upload_file("temp_image.jpg", mime_type="image/jpeg")
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config={
+            "temperature": 0.9,
+            "top_p": 0.95,
+            "top_k": 32,
+            "max_output_tokens": 1024,
+            "response_mime_type": "text/plain"
+        }
+    )
 
-        # Step 3: Upload the image to Gemini
-        uploaded_file = genai.upload_file("temp_image.jpg", mime_type="image/jpeg")
-
-        # Step 4: Generate text content from the image using Gemini
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            generation_config={
-                "temperature": 0.9,
-                "top_p": 0.95,
-                "top_k": 32,
-                "max_output_tokens": 1024,
-                "response_mime_type": "text/plain"
-            }
-        )
-
-        response = model.generate_content([uploaded_file, "Describe the image"])
-        return response.text
-    else:
-        return "Error processing image"
+    response = model.generate_content([uploaded_file, 
+        "Provide a brief description of the image, like hints, without revealing the actual image. "
+        "Keep the description limited to 2 to 3 points."
+    ])
+    
+    return response.text, base64_image
 
 # API route to send the image data to the frontend
 @app.route('/generate', methods=['POST'])
@@ -63,10 +74,10 @@ def generate_image():
         return jsonify({"error": "Unable to fetch image"}), 500
 
     # Use Gemini to generate text from the image
-    description = process_image_with_gemini(image_info["image_url"])
+    description, base64_image = process_image_with_gemini(image_info["image_url"])
     
-    # Return the image URL and description to the frontend
-    return jsonify({"image_url": image_info["image_url"], "description": description})
+    # Return the base64 image and description to the frontend
+    return jsonify({"image_url": base64_image, "description": description})
 
 if __name__ == "__main__":
     app.run(debug=True)
